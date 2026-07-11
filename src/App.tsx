@@ -195,6 +195,11 @@ export default function App() {
       };
     });
 
+    const b1 = calificacionesPorBloque.find((c) => c.modulo === 1);
+    const b2 = calificacionesPorBloque.find((c) => c.modulo === 2);
+    const b3 = calificacionesPorBloque.find((c) => c.modulo === 3);
+    const b4 = calificacionesPorBloque.find((c) => c.modulo === 4);
+
     const payload: ExamResult = {
       fecha,
       hora,
@@ -212,6 +217,55 @@ export default function App() {
       tiempoEmpleado: totalTimeStr,
       detalles: answerDetails,
       calificacionesPorBloque,
+
+      // Flat keys for Google Sheets columns to guarantee easy mapping:
+      // Login / login info
+      nombre: participant.nombreCompleto,
+      identificacion: `${participant.tipoIdentificacion}: ${participant.numeroIdentificacion}`,
+      cedula: participant.numeroIdentificacion,
+      tipo_identificacion: participant.tipoIdentificacion,
+      licencia: participant.tipoLicencia,
+
+      // Block-by-block score percentages
+      calificacionBloque1: b1 ? b1.puntaje : 0,
+      calificacionBloque2: b2 ? b2.puntaje : 0,
+      calificacionBloque3: b3 ? b3.puntaje : 0,
+      calificacionBloque4: b4 ? b4.puntaje : 0,
+
+      // Block-by-block scores (e.g. "85%")
+      calificacion_bloque_1: b1 ? `${b1.puntaje}%` : '0%',
+      calificacion_bloque_2: b2 ? `${b2.puntaje}%` : '0%',
+      calificacion_bloque_3: b3 ? `${b3.puntaje}%` : '0%',
+      calificacion_bloque_4: b4 ? `${b4.puntaje}%` : '0%',
+
+      // Block-by-block results
+      resultado_bloque_1: b1 ? b1.resultado : 'No aprobado',
+      resultado_bloque_2: b2 ? b2.resultado : 'No aprobado',
+      resultado_bloque_3: b3 ? b3.resultado : 'No aprobado',
+      resultado_bloque_4: b4 ? b4.resultado : 'No aprobado',
+
+      // Detailed Block info
+      bloque1: b1 ? `${b1.puntaje}% (${b1.resultado})` : '0%',
+      bloque2: b2 ? `${b2.puntaje}% (${b2.resultado})` : '0%',
+      bloque3: b3 ? `${b3.puntaje}% (${b3.resultado})` : '0%',
+      bloque4: b4 ? `${b4.puntaje}% (${b4.resultado})` : '0%',
+
+      // Block fraction score
+      correctasBloque1: b1 ? b1.correctas : 0,
+      totalBloque1: b1 ? b1.total : 0,
+      correctasBloque2: b2 ? b2.correctas : 0,
+      totalBloque2: b2 ? b2.total : 0,
+      correctasBloque3: b3 ? b3.correctas : 0,
+      totalBloque3: b3 ? b3.total : 0,
+      correctasBloque4: b4 ? b4.correctas : 0,
+      totalBloque4: b4 ? b4.total : 0,
+
+      // Total score and final result
+      calificacionTotal: `${finalScore}%`,
+      calificacion_total: `${finalScore}%`,
+      resultadoTotal: finalScore >= 80 ? 'Aprobado' : 'No aprobado',
+      resultado_total: finalScore >= 80 ? 'Aprobado' : 'No aprobado',
+      aprobado: finalScore >= 80 ? 'SÍ' : 'NO',
     };
 
     try {

@@ -56,4 +56,5 @@ export interface ExamResult {
   tiempoEmpleado: string;
   detalles: AnswerDetail[];
   calificacionesPorBloque: BlockScore[];
+  [key: string]: any;
 }
