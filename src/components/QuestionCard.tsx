@@ -54,13 +54,13 @@ export default function QuestionCard({
   const getModuleName = (modId: number) => {
     switch (modId) {
       case 1:
-        return 'Módulo 1: Normas de Tránsito';
+        return 'Módulo 1: Normativa Vial';
       case 2:
-        return 'Módulo 2: Señales de Tránsito';
+        return 'Módulo 2: Infraestructura y Señalización';
       case 3:
-        return 'Módulo 3: Mecánica y Seguridad';
+        return 'Módulo 3: Mecánica Básica';
       case 4:
-        return 'Módulo 4: Primeros Auxilios';
+        return 'Módulo 4: Situaciones de Conducción';
       default:
         return 'Evaluación Teórica';
     }

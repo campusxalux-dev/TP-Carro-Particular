@@ -228,8 +228,13 @@ export default function App() {
           {/* Dynamic App Brand Header */}
           <div className="bg-blue-700 pt-8 sm:pt-10 pb-4 px-6 shrink-0 shadow-sm">
             <div className="flex justify-between items-center mb-2.5">
-              <div className="w-12 h-6 bg-yellow-400 rounded-md flex items-center justify-center font-bold text-blue-950 text-[10px] tracking-wider shadow-sm select-none">
-                VIAL
+              <div className="flex items-center gap-2 select-none">
+                <img
+                  src="/vial_logo.png"
+                  alt="Logo VIAL"
+                  referrerPolicy="no-referrer"
+                  className="h-8 w-auto object-contain bg-white/20 rounded-lg p-1 shadow-sm border border-white/10"
+                />
               </div>
               <div className="text-white/80 text-[10px] font-bold tracking-wider uppercase font-mono">
                 {step === 'REGISTER' && 'Registro Inicial'}
