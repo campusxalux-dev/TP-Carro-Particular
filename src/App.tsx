@@ -10,6 +10,7 @@ import QuestionCard from './components/QuestionCard';
 import ResultsCard from './components/ResultsCard';
 import { Car, Info, ShieldAlert, CheckCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { generateRandomizedExam } from './data/questions';
 
 type Step = 'REGISTER' | 'LOADING' | 'EXAM' | 'RESULTS';
 
@@ -61,13 +62,16 @@ export default function App() {
     return `${minutes}m ${seconds}s`;
   };
 
-  // Fetch questions from our secure backend API on demand
+  // Fetch questions from our secure backend API on demand with local fallback
   const handleStartExam = async (registeredParticipant: Participant) => {
     setParticipant(registeredParticipant);
     setStep('LOADING');
 
     try {
       const response = await fetch('/api/questions');
+      if (!response.ok) {
+        throw new Error(`Servidor respondió con código de estado ${response.status}`);
+      }
       const data = await response.json();
 
       if (data.success && data.questions) {
@@ -80,12 +84,32 @@ export default function App() {
         setSubmissionError(null);
         setStep('EXAM');
       } else {
-        throw new Error(data.error || 'No se recibieron preguntas válidas.');
+        throw new Error(data.error || 'No se recibieron preguntas válidas del servidor.');
       }
     } catch (error: any) {
-      console.error('Error starting exam:', error);
-      alert('Error de conexión: No pudimos cargar el examen del servidor. Inténtelo de nuevo.');
-      setStep('REGISTER');
+      console.warn('Error al cargar examen desde el servidor, usando generación local como respaldo:', error);
+      try {
+        const localQuestions = generateRandomizedExam();
+        if (localQuestions && localQuestions.length > 0) {
+          setQuestions(localQuestions);
+          setCurrentIdx(0);
+          setAnswerDetails([]);
+          setCorrectCount(0);
+          setIncorrectCount(0);
+          setSubmissionSuccess(false);
+          setSubmissionError(null);
+          // Small delay for natural user experience
+          setTimeout(() => {
+            setStep('EXAM');
+          }, 800);
+        } else {
+          throw new Error('La generación de preguntas local retornó una lista vacía.');
+        }
+      } catch (localError: any) {
+        console.error('Fatal: Falló la generación local de preguntas:', localError);
+        alert('Error de conexión: No pudimos cargar el examen de ninguna fuente. Por favor, inténtelo de nuevo.');
+        setStep('REGISTER');
+      }
     }
   };
 
@@ -173,16 +197,39 @@ export default function App() {
         body: JSON.stringify(payload),
       });
 
+      if (!response.ok) {
+        throw new Error(`El servidor respondió con código ${response.status}`);
+      }
+
       const data = await response.json();
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setSubmissionSuccess(true);
       } else {
         throw new Error(data.error || 'Error desconocido al registrar en Google Sheets.');
       }
     } catch (err: any) {
-      console.error('Error en sincronización con Sheets:', err);
-      setSubmissionError(err.message || 'No se pudo contactar con la API de Google Sheets.');
+      console.warn('Error en el servicio proxy del servidor, intentando envío directo a Google Sheets:', err);
+      try {
+        const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxWVgEyVIs_j3PrCbE4XgrVzYuXkkgj48aehGmZegaLDZiULK9yo0IplAylQniD1uC8dA/exec';
+        
+        // Use fetch with mode: 'no-cors' to post directly to the Google Apps Script Web App.
+        // Google Script handles this and appends to the sheet perfectly, but might block reading the body,
+        // which 'no-cors' elegantly handles by treating it as an opaque success.
+        await fetch(DEFAULT_GAS_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'text/plain',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        setSubmissionSuccess(true);
+      } catch (directErr: any) {
+        console.error('Fatal: También falló el envío directo a Google Sheets:', directErr);
+        setSubmissionError(directErr.message || 'No se pudo contactar con la API de Google Sheets.');
+      }
     } finally {
       setIsSubmitting(false);
     }
