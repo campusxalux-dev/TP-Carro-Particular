@@ -12,8 +12,6 @@ import { Car, Info, ShieldAlert, CheckCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateRandomizedExam } from './data/questions';
 import vialLogo from './assets/images/vial_logo_1783784221633.jpg';
-import GoogleSyncPanel from './components/GoogleSyncPanel';
-import { getAccessToken, appendResultToSheet } from './lib/googleApi';
 
 type Step = 'REGISTER' | 'LOADING' | 'EXAM' | 'RESULTS';
 
@@ -23,7 +21,6 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [answerDetails, setAnswerDetails] = useState<AnswerDetail[]>([]);
-  const [selectedSpreadsheetId, setSelectedSpreadsheetId] = useState<string | null>(null);
   
   // Scoring
   const [correctCount, setCorrectCount] = useState<number>(0);
@@ -192,18 +189,6 @@ export default function App() {
       detalles: answerDetails,
     };
 
-    let directSheetSuccess = false;
-    const userToken = getAccessToken();
-    if (userToken && selectedSpreadsheetId) {
-      try {
-        console.log('Sincronizando con Google Sheet personal...', selectedSpreadsheetId);
-        await appendResultToSheet(userToken, selectedSpreadsheetId, payload);
-        directSheetSuccess = true;
-      } catch (sheetErr: any) {
-        console.error('Error guardando en Google Sheet personal:', sheetErr);
-      }
-    }
-
     try {
       const response = await fetch('/api/results', {
         method: 'POST',
@@ -214,27 +199,19 @@ export default function App() {
       });
 
       if (!response.ok) {
-        if (directSheetSuccess) {
-          setSubmissionSuccess(true);
-          return;
-        }
         throw new Error(`El servidor respondió con código ${response.status}`);
       }
 
       const data = await response.json();
 
-      if (data.success || directSheetSuccess) {
+      if (data.success) {
         setSubmissionSuccess(true);
       } else {
         throw new Error(data.error || 'Error al sincronizar resultados.');
       }
     } catch (err: any) {
       console.error('Error en sincronización con Sheets:', err);
-      if (directSheetSuccess) {
-        setSubmissionSuccess(true);
-      } else {
-        setSubmissionError(err.message || 'No se pudo contactar con la API de Google Sheets.');
-      }
+      setSubmissionError(err.message || 'No se pudo contactar con la API de Google Sheets.');
     } finally {
       setIsSubmitting(false);
     }
@@ -285,7 +262,7 @@ export default function App() {
                   src={vialLogo}
                   alt="Instituto Colombiano de Seguridad y Salud en el Trabajo"
                   referrerPolicy="no-referrer"
-                  className="h-10 w-auto object-contain bg-white rounded p-0.5 shadow-sm border border-white/20"
+                  className="h-[51px] w-[145px] object-contain bg-[#fffefe] rounded p-1 shadow-sm border border-white/20"
                 />
               </div>
               <div className="text-white/80 text-[10px] font-bold tracking-wider uppercase font-mono">
@@ -345,11 +322,6 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-
-                  <GoogleSyncPanel
-                    onSpreadsheetSelected={setSelectedSpreadsheetId}
-                    selectedSpreadsheetId={selectedSpreadsheetId}
-                  />
 
                   <RegistrationForm onStartExam={handleStartExam} />
                 </motion.div>
