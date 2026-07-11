@@ -13,7 +13,7 @@ import { generateRandomizedExam } from './src/data/questions';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzOmvP5hqCOEiFHEM2MzS458Fp2s2XKKF4MYpuzs4PTI7pyh5m0YHr9aFJQlGEYkhvt3w/exec';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbjgMVJJdfgAwWhXKX4kI-1qlIMS-r8xhRuduQx5sLXRhTWk59rFi8Eaw7f6xUtJ3jV1w/exec';
 
 async function startServer() {
   const app = express();
