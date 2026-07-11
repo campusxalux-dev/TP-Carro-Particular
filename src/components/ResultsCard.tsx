@@ -5,8 +5,9 @@
 
 import React, { useState } from 'react';
 import { Participant, AnswerDetail, ExamResult } from '../types';
-import { CheckCircle, XCircle, Calendar, Clock, Award, Briefcase, FileText, User, ChevronDown, ChevronUp, AlertCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Calendar, Clock, Award, Briefcase, FileText, User, ChevronDown, ChevronUp, AlertCircle, RefreshCw, Cloud } from 'lucide-react';
 import { motion } from 'motion/react';
+import { getAccessToken, saveReportToDrive } from '../lib/googleApi';
 
 interface ResultsCardProps {
   participant: Participant;
@@ -40,10 +41,81 @@ export default function ResultsCard({
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const isApproved = score >= 80; // 80% passing grade is the standard for driving exams
 
+  // Google Drive states
+  const [isSavingToDrive, setIsSavingToDrive] = useState<boolean>(false);
+  const [driveSaveSuccess, setDriveSaveSuccess] = useState<boolean>(false);
+  const [driveSaveError, setDriveSaveError] = useState<string | null>(null);
+
   // Get current Date and Time
   const now = new Date();
   const fechaStr = now.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
   const horaStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+  const handleSaveToDrive = async () => {
+    const token = getAccessToken();
+    if (!token) {
+      setDriveSaveError('Debes conectar tu cuenta de Google al inicio para exportar a Google Drive.');
+      return;
+    }
+
+    setIsSavingToDrive(true);
+    setDriveSaveError(null);
+    setDriveSaveSuccess(false);
+
+    try {
+      const fileName = `Certificado_VIAL_${participant.nombreCompleto.trim().replace(/\s+/g, '_')}_${now.getTime()}.txt`;
+      
+      const detailsText = answerDetails.map(d => 
+        `Pregunta ${d.numero}: ${d.pregunta}\n- Tu respuesta: ${d.seleccionada}\n- Correcta: ${d.correctaTexto}\n- Resultado: ${d.esCorrecta ? '✓ CORRECTA' : '✗ INCORRECTA'}\n`
+      ).join('\n');
+
+      const content = `
+========================================================================
+     INSTITUTO COLOMBIANO DE SEGURIDAD Y SALUD EN EL TRABAJO
+                  CERTIFICADO DE SIMULACRO VIAL
+========================================================================
+
+Por medio del presente se certifica que el aspirante ha completado la
+Evaluación Teórica para Conductores (Particular).
+
+DATOS DEL PARTICIPANTE:
+------------------------------------------------------------------------
+Nombre Completo   : ${participant.nombreCompleto}
+Identificación    : ${participant.tipoIdentificacion} - ${participant.numeroIdentificacion}
+Edad              : ${participant.edad} años
+Empresa           : ${participant.empresa}
+Antigüedad        : ${participant.antiguedad} años de antigüedad
+Categoría Licencia: ${participant.tipoLicencia}
+
+RESULTADOS DE LA EVALUACIÓN:
+------------------------------------------------------------------------
+Fecha de Intento  : ${fechaStr}
+Hora de Intento   : ${horaStr}
+Puntaje Final     : ${score}/100
+Respuestas OK     : ${correctCount} correctas
+Respuestas Malas  : ${incorrectCount} incorrectas
+Estado Final      : ${isApproved ? 'APROBADO (Apto para Conducir)' : 'NO APROBADO (Reprobado)'}
+Tiempo Empleado   : ${timeElapsed}
+
+------------------------------------------------------------------------
+DESGLOSE DETALLADO DE RESPUESTAS:
+------------------------------------------------------------------------
+${detailsText}
+
+========================================================================
+    Sincronizado y generado mediante la integración de Google Drive.
+========================================================================
+`;
+
+      await saveReportToDrive(token, fileName, content.trim());
+      setDriveSaveSuccess(true);
+    } catch (err: any) {
+      console.error('Error saving to Drive:', err);
+      setDriveSaveError('No se pudo guardar el archivo en Google Drive.');
+    } finally {
+      setIsSavingToDrive(false);
+    }
+  };
 
   return (
     <div id="results-card-container" className="space-y-5 pt-1">
@@ -204,6 +276,52 @@ export default function ResultsCard({
             </button>
           </div>
         ) : null}
+      </div>
+
+      {/* Google Drive Certificate Section */}
+      <div className="bg-white rounded-xl p-3 border border-slate-200 text-xs shadow-2xs space-y-2.5">
+        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+          <Cloud size={14} className="text-blue-600" />
+          <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+            Google Drive
+          </h4>
+        </div>
+        <p className="text-[10px] text-slate-500 leading-normal">
+          Genera y guarda un certificado oficial detallado en formato de texto directamente en la raíz de tu Google Drive.
+        </p>
+
+        {getAccessToken() ? (
+          <div className="pt-0.5">
+            {driveSaveSuccess ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 text-green-800">
+                <p className="font-bold text-xs text-green-700">✓ Certificado Guardado</p>
+                <p className="text-[9px] font-medium text-slate-500 leading-normal">
+                  El archivo con tus resultados se ha guardado en tu Google Drive de manera exitosa.
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={handleSaveToDrive}
+                disabled={isSavingToDrive}
+                className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold py-2.5 px-3 rounded-xl text-[10px] uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-98"
+              >
+                {isSavingToDrive ? (
+                  <RefreshCw size={12} className="animate-spin" />
+                ) : (
+                  <Cloud size={12} />
+                )}
+                <span>Guardar Certificado en Drive</span>
+              </button>
+            )}
+            {driveSaveError && (
+              <p className="text-red-500 text-[9px] font-semibold mt-1.5">{driveSaveError}</p>
+            )}
+          </div>
+        ) : (
+          <div className="bg-slate-100/80 rounded-lg p-2 text-center text-slate-400 text-[9px] font-bold uppercase tracking-tight">
+            Vincula tu cuenta en inicio para activar Drive
+          </div>
+        )}
       </div>
 
       {/* Accordion list to review full questions details */}

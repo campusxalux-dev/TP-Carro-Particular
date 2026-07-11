@@ -20,7 +20,7 @@ export const questionsPool: Question[] = [
     id: 'm1_3', modulo: 1,
     pregunta: '¿Cuál es la vigencia de la Revisión Técnico-Mecánica y de Emisiones Contaminantes para un carro particular nuevo, contando desde la fecha de su matrícula?',
     opciones: ['Debe realizarse por primera vez al cumplir el quinto (5°) año de matrícula.', 'Se realiza obligatoriamente de forma anual a partir del primer año.', 'Debe efectuarse por primera vez al cumplir el sexto (6°) año de matrícula.', 'Se exige únicamente a partir del décimo año de antigüedad del automotor.'],
-    correcta: 2
+    correcta: 0
   },
   {
     id: 'm1_4', modulo: 1,

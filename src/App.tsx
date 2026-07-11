@@ -11,6 +11,9 @@ import ResultsCard from './components/ResultsCard';
 import { Car, Info, ShieldAlert, CheckCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateRandomizedExam } from './data/questions';
+import vialLogo from './assets/images/vial_logo_1783784221633.jpg';
+import GoogleSyncPanel from './components/GoogleSyncPanel';
+import { getAccessToken, appendResultToSheet } from './lib/googleApi';
 
 type Step = 'REGISTER' | 'LOADING' | 'EXAM' | 'RESULTS';
 
@@ -20,6 +23,7 @@ export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [answerDetails, setAnswerDetails] = useState<AnswerDetail[]>([]);
+  const [selectedSpreadsheetId, setSelectedSpreadsheetId] = useState<string | null>(null);
   
   // Scoring
   const [correctCount, setCorrectCount] = useState<number>(0);
@@ -188,6 +192,18 @@ export default function App() {
       detalles: answerDetails,
     };
 
+    let directSheetSuccess = false;
+    const userToken = getAccessToken();
+    if (userToken && selectedSpreadsheetId) {
+      try {
+        console.log('Sincronizando con Google Sheet personal...', selectedSpreadsheetId);
+        await appendResultToSheet(userToken, selectedSpreadsheetId, payload);
+        directSheetSuccess = true;
+      } catch (sheetErr: any) {
+        console.error('Error guardando en Google Sheet personal:', sheetErr);
+      }
+    }
+
     try {
       const response = await fetch('/api/results', {
         method: 'POST',
@@ -198,37 +214,26 @@ export default function App() {
       });
 
       if (!response.ok) {
+        if (directSheetSuccess) {
+          setSubmissionSuccess(true);
+          return;
+        }
         throw new Error(`El servidor respondió con código ${response.status}`);
       }
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success || directSheetSuccess) {
         setSubmissionSuccess(true);
       } else {
-        throw new Error(data.error || 'Error desconocido al registrar en Google Sheets.');
+        throw new Error(data.error || 'Error al sincronizar resultados.');
       }
     } catch (err: any) {
-      console.warn('Error en el servicio proxy del servidor, intentando envío directo a Google Sheets:', err);
-      try {
-        const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxWVgEyVIs_j3PrCbE4XgrVzYuXkkgj48aehGmZegaLDZiULK9yo0IplAylQniD1uC8dA/exec';
-        
-        // Use fetch with mode: 'no-cors' to post directly to the Google Apps Script Web App.
-        // Google Script handles this and appends to the sheet perfectly, but might block reading the body,
-        // which 'no-cors' elegantly handles by treating it as an opaque success.
-        await fetch(DEFAULT_GAS_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'text/plain',
-          },
-          body: JSON.stringify(payload),
-        });
-
+      console.error('Error en sincronización con Sheets:', err);
+      if (directSheetSuccess) {
         setSubmissionSuccess(true);
-      } catch (directErr: any) {
-        console.error('Fatal: También falló el envío directo a Google Sheets:', directErr);
-        setSubmissionError(directErr.message || 'No se pudo contactar con la API de Google Sheets.');
+      } else {
+        setSubmissionError(err.message || 'No se pudo contactar con la API de Google Sheets.');
       }
     } finally {
       setIsSubmitting(false);
@@ -277,10 +282,10 @@ export default function App() {
             <div className="flex justify-between items-center mb-2.5">
               <div className="flex items-center gap-2 select-none">
                 <img
-                  src="/vial_logo.png"
-                  alt="Logo VIAL"
+                  src={vialLogo}
+                  alt="Instituto Colombiano de Seguridad y Salud en el Trabajo"
                   referrerPolicy="no-referrer"
-                  className="h-8 w-auto object-contain bg-white/20 rounded-lg p-1 shadow-sm border border-white/10"
+                  className="h-10 w-auto object-contain bg-white rounded p-0.5 shadow-sm border border-white/20"
                 />
               </div>
               <div className="text-white/80 text-[10px] font-bold tracking-wider uppercase font-mono">
@@ -340,6 +345,11 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+
+                  <GoogleSyncPanel
+                    onSpreadsheetSelected={setSelectedSpreadsheetId}
+                    selectedSpreadsheetId={selectedSpreadsheetId}
+                  />
 
                   <RegistrationForm onStartExam={handleStartExam} />
                 </motion.div>
@@ -418,37 +428,6 @@ export default function App() {
             <p>© 2026 Seguridad Vial S.A.S. • Conectado</p>
             {/* Phone Home Bar Accent */}
             <div className="w-24 h-1 bg-slate-300 rounded-full mx-auto mt-2 hidden sm:block"></div>
-          </div>
-        </div>
-
-        {/* Feature Callouts Sidebar (Visible only on desktop sizes) */}
-        <div className="hidden lg:flex flex-col gap-5 ml-8 w-68 shrink-0">
-          <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-200">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-3 text-blue-600">
-              <CheckCircle size={20} className="stroke-[2]" />
-            </div>
-            <h3 className="text-slate-800 font-bold text-xs mb-1 uppercase tracking-tight">Calificación Inmediata</h3>
-            <p className="text-slate-500 text-[11px] leading-relaxed">
-              Feedback instantáneo en tiempo real con validación visual verde/naranja para cada respuesta seleccionada.
-            </p>
-          </div>
-          
-          <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-200">
-            <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center mb-3 text-yellow-700">
-              <Car size={20} className="stroke-[2]" />
-            </div>
-            <h3 className="text-slate-800 font-bold text-xs mb-1 uppercase tracking-tight">Sync Google Sheets</h3>
-            <p className="text-slate-500 text-[11px] leading-relaxed">
-              Tus resultados se sincronizan y almacenan de forma automática al finalizar mediante Google Apps Script.
-            </p>
-          </div>
-
-          <div className="bg-slate-900 p-5 rounded-2xl shadow-lg border-l-4 border-yellow-400">
-            <p className="text-white/60 text-[9px] uppercase font-bold mb-1 tracking-widest font-mono">Estado del Sistema</p>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></span>
-              <span className="text-white text-xs font-semibold">API de Google Conectada</span>
-            </div>
           </div>
         </div>
 

@@ -52,14 +52,61 @@ async function startServer() {
       console.log('Respuesta del Apps Script:', responseText);
 
       let parsedResponse;
-      try {
-        parsedResponse = JSON.parse(responseText);
-      } catch (e) {
-        parsedResponse = { status: 'unknown', raw: responseText };
+      let isSuccess = false;
+
+      if (response.ok && responseText) {
+        const trimmedText = responseText.trim();
+        if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
+          try {
+            parsedResponse = JSON.parse(trimmedText);
+            // Standard Apps Script JSON responses:
+            // e.g., { status: "success" }, { result: "success" }, { success: true }, etc.
+            if (
+              parsedResponse.status === 'success' ||
+              parsedResponse.result === 'success' ||
+              parsedResponse.success === true ||
+              parsedResponse.status === 'ok' ||
+              parsedResponse.result === 'ok'
+            ) {
+              isSuccess = true;
+            } else if (
+              parsedResponse.status === 'error' ||
+              parsedResponse.success === false ||
+              parsedResponse.result === 'error'
+            ) {
+              isSuccess = false;
+            } else {
+              // If it's a valid JSON but has other properties, let's treat it as success
+              isSuccess = true;
+            }
+          } catch (e) {
+            parsedResponse = { status: 'unknown', raw: responseText };
+            isSuccess = false;
+          }
+        } else {
+          // It's plain text. Check if it equals "success", "ok", "true", or contains them
+          const lowerText = trimmedText.toLowerCase();
+          if (
+            lowerText === 'success' ||
+            lowerText === 'ok' ||
+            lowerText === 'true' ||
+            lowerText.includes('success') ||
+            (lowerText.includes('ok') && trimmedText.length < 50)
+          ) {
+            isSuccess = true;
+            parsedResponse = { status: 'success', raw: responseText };
+          } else {
+            parsedResponse = { status: 'unknown', raw: responseText };
+            isSuccess = false;
+          }
+        }
+      } else {
+        parsedResponse = { status: 'failed', raw: responseText };
+        isSuccess = false;
       }
 
       res.json({
-        success: response.ok,
+        success: isSuccess,
         status: response.status,
         data: parsedResponse,
       });
