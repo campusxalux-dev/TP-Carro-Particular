@@ -5,6 +5,7 @@
 
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { generateRandomizedExam } from './src/data/questions';
 
@@ -32,12 +33,52 @@ async function startServer() {
     }
   });
 
+  // API: Get all saved results (locally)
+  app.get('/api/results', (req, res) => {
+    try {
+      const resultsFilePath = path.join(process.cwd(), 'results.json');
+      if (fs.existsSync(resultsFilePath)) {
+        const fileData = fs.readFileSync(resultsFilePath, 'utf-8');
+        res.json({ success: true, results: JSON.parse(fileData) });
+      } else {
+        res.json({ success: true, results: [] });
+      }
+    } catch (error: any) {
+      console.error('Error reading results:', error);
+      res.status(500).json({ success: false, error: 'No se pudieron leer los resultados.' });
+    }
+  });
+
   // API: Save exam results by proxying to the Google Apps Script Web App
   app.post('/api/results', async (req, res) => {
-    try {
-      const resultData = req.body;
-      const gasUrl = process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_GAS_URL;
+    const resultData = req.body;
+    const gasUrl = process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_GAS_URL;
 
+    // 1. Always save results locally as a secure backup first
+    const resultsFilePath = path.join(process.cwd(), 'results.json');
+    let currentResults = [];
+    try {
+      if (fs.existsSync(resultsFilePath)) {
+        const fileData = fs.readFileSync(resultsFilePath, 'utf-8');
+        currentResults = JSON.parse(fileData);
+      }
+    } catch (err) {
+      console.error('Error al leer results.json backup:', err);
+    }
+
+    currentResults.push(resultData);
+
+    let localSaveSuccess = false;
+    try {
+      fs.writeFileSync(resultsFilePath, JSON.stringify(currentResults, null, 2), 'utf-8');
+      console.log('Resultados guardados localmente con éxito en results.json');
+      localSaveSuccess = true;
+    } catch (err) {
+      console.error('Error al escribir en results.json:', err);
+    }
+
+    // 2. Try proxying to Google Apps Script (but proceed/succeed anyway if local backup is saved)
+    try {
       console.log('Enviando resultados a Google Apps Script:', gasUrl);
 
       const response = await fetch(gasUrl, {
@@ -59,8 +100,6 @@ async function startServer() {
         if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
           try {
             parsedResponse = JSON.parse(trimmedText);
-            // Standard Apps Script JSON responses:
-            // e.g., { status: "success" }, { result: "success" }, { success: true }, etc.
             if (
               parsedResponse.status === 'success' ||
               parsedResponse.result === 'success' ||
@@ -69,22 +108,15 @@ async function startServer() {
               parsedResponse.result === 'ok'
             ) {
               isSuccess = true;
-            } else if (
-              parsedResponse.status === 'error' ||
-              parsedResponse.success === false ||
-              parsedResponse.result === 'error'
-            ) {
-              isSuccess = false;
             } else {
-              // If it's a valid JSON but has other properties, let's treat it as success
-              isSuccess = true;
+              // If we saved locally, we can still say success is true
+              isSuccess = localSaveSuccess;
             }
           } catch (e) {
             parsedResponse = { status: 'unknown', raw: responseText };
-            isSuccess = false;
+            isSuccess = localSaveSuccess;
           }
         } else {
-          // It's plain text. Check if it equals "success", "ok", "true", or contains them
           const lowerText = trimmedText.toLowerCase();
           if (
             lowerText === 'success' ||
@@ -97,26 +129,35 @@ async function startServer() {
             parsedResponse = { status: 'success', raw: responseText };
           } else {
             parsedResponse = { status: 'unknown', raw: responseText };
-            isSuccess = false;
+            isSuccess = localSaveSuccess;
           }
         }
       } else {
-        parsedResponse = { status: 'failed', raw: responseText };
-        isSuccess = false;
+        parsedResponse = { status: 'failed', raw: responseText, note: 'Saved locally as backup' };
+        isSuccess = localSaveSuccess;
       }
 
       res.json({
         success: isSuccess,
-        status: response.status,
+        status: response ? response.status : 200,
         data: parsedResponse,
       });
     } catch (error: any) {
-      console.error('Error al enviar resultados a Google Sheets:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Error de servidor al intentar registrar el examen en Google Sheets.',
-        details: error.message,
-      });
+      console.error('Error al enviar resultados a Google Sheets (usando respaldo local):', error);
+      if (localSaveSuccess) {
+        // Return success if we backed it up locally
+        res.json({
+          success: true,
+          status: 200,
+          data: { status: 'local_save_only', message: 'Resultados guardados localmente, falló conexión a Google Sheets.', error: error.message }
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Error de servidor al intentar registrar el examen localmente y en Google Sheets.',
+          details: error.message,
+        });
+      }
     }
   });
 

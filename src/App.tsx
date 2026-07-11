@@ -133,6 +133,7 @@ export default function App() {
       seleccionada: selectedOptionText,
       correctaTexto: correctOptionText,
       esCorrecta: isCorrect,
+      modulo: questions[currentIdx].modulo,
     };
 
     setAnswerDetails((prev) => [...prev, newDetail]);
@@ -171,6 +172,29 @@ export default function App() {
     const fecha = now.toLocaleDateString('es-CO');
     const hora = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+    // Calculate score per module/block
+    const moduleNames: Record<number, string> = {
+      1: 'Normativa Vial en Colombia',
+      2: 'Señales de Tránsito y Señalización Vial',
+      3: 'Mecánica Básica y Primeros Auxilios',
+      4: 'Conducción Defensiva y Seguridad Vial',
+    };
+
+    const calificacionesPorBloque = [1, 2, 3, 4].map((m) => {
+      const detailsInModule = answerDetails.filter((d) => d.modulo === m);
+      const correctInModule = detailsInModule.filter((d) => d.esCorrecta).length;
+      const totalInModule = detailsInModule.length;
+      const scoreInModule = totalInModule > 0 ? Math.round((correctInModule / totalInModule) * 100) : 0;
+      return {
+        modulo: m,
+        nombre: moduleNames[m],
+        correctas: correctInModule,
+        total: totalInModule,
+        puntaje: scoreInModule,
+        resultado: (scoreInModule >= 80 ? 'Aprobado' : 'No aprobado') as 'Aprobado' | 'No aprobado',
+      };
+    });
+
     const payload: ExamResult = {
       fecha,
       hora,
@@ -187,6 +211,7 @@ export default function App() {
       resultado: finalScore >= 80 ? 'Aprobado' : 'No aprobado',
       tiempoEmpleado: totalTimeStr,
       detalles: answerDetails,
+      calificacionesPorBloque,
     };
 
     try {

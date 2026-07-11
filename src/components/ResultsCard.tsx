@@ -45,6 +45,29 @@ export default function ResultsCard({
   const fechaStr = now.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
   const horaStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
+  // Calculate scores per block/module
+  const moduleNames: Record<number, string> = {
+    1: 'Normativa Vial en Colombia',
+    2: 'Señales de Tránsito y Señalización Vial',
+    3: 'Mecánica Básica y Primeros Auxilios',
+    4: 'Conducción Defensiva y Seguridad Vial',
+  };
+
+  const blockScores = [1, 2, 3, 4].map((m) => {
+    const detailsInModule = answerDetails.filter((d) => d.modulo === m);
+    const correctInModule = detailsInModule.filter((d) => d.esCorrecta).length;
+    const totalInModule = detailsInModule.length;
+    const scoreInModule = totalInModule > 0 ? Math.round((correctInModule / totalInModule) * 100) : 0;
+    return {
+      modulo: m,
+      nombre: moduleNames[m],
+      correctas: correctInModule,
+      total: totalInModule,
+      puntaje: scoreInModule,
+      isApproved: scoreInModule >= 80,
+    };
+  });
+
   return (
     <div id="results-card-container" className="space-y-5 pt-1">
       {/* Top Approval Banner */}
@@ -169,6 +192,44 @@ export default function ResultsCard({
             <Clock size={9} />
             {horaStr}
           </span>
+        </div>
+      </div>
+
+      {/* Block-by-Block Scores Card */}
+      <div id="block-scores-card" className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-2xs">
+        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+          <Award size={12} className="text-blue-600" />
+          Calificaciones por Bloque
+        </h3>
+        <div className="space-y-2.5">
+          {blockScores.map((block) => (
+            <div key={block.modulo} className="bg-slate-50/60 p-2.5 rounded-xl border border-slate-150/60 flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="font-bold text-slate-700 tracking-tight">
+                  Bloque {block.modulo}: {block.nombre}
+                </span>
+                <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[9px] ${
+                  block.isApproved ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                }`}>
+                  {block.puntaje}% ({block.isApproved ? 'Aprobado' : 'No aprobado'})
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Progress bar */}
+                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      block.isApproved ? 'bg-green-500' : 'bg-orange-500'
+                    }`}
+                    style={{ width: `${block.puntaje}%` }}
+                  />
+                </div>
+                <span className="text-[9px] font-bold text-slate-500 font-mono shrink-0">
+                  {block.correctas}/{block.total} OK
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

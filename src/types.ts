@@ -27,6 +27,16 @@ export interface AnswerDetail {
   seleccionada: string;
   correctaTexto: string;
   esCorrecta: boolean;
+  modulo: number;
+}
+
+export interface BlockScore {
+  modulo: number;
+  nombre: string;
+  correctas: number;
+  total: number;
+  puntaje: number;
+  resultado: 'Aprobado' | 'No aprobado';
 }
 
 export interface ExamResult {
@@ -45,4 +55,5 @@ export interface ExamResult {
   resultado: 'Aprobado' | 'No aprobado';
   tiempoEmpleado: string;
   detalles: AnswerDetail[];
+  calificacionesPorBloque: BlockScore[];
 }
